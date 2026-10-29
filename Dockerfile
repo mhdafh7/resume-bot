@@ -17,7 +17,7 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
 
 # ── Stage 2: Runtime image ────────────────────────────────────────────────────
-FROM debian:bookworm-slim AS runtime
+FROM python:3.12-slim AS runtime
 
 # Avoid interactive prompts during apt
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -29,21 +29,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # texlive-latex-recommended    – common packages (geometry, enumitem, …)
 # texlive-fonts-recommended    – standard font sets
 # lmodern                      – Latin Modern fonts (lm*.tfm / lm*.pfb)
-# python3, python3-pip         – Python runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
         texlive-latex-base \
         texlive-latex-recommended \
         texlive-fonts-recommended \
         lmodern \
-        python3 \
-        python3-pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python runtime ─────────────────────────────────────────────────────────
 # Re-use the pre-built wheels from the builder stage
 COPY --from=builder /wheels /wheels
-RUN pip3 install --no-cache-dir --no-index --find-links=/wheels /wheels/*.whl \
+RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*.whl \
     && rm -rf /wheels
 
 # ── Application source ────────────────────────────────────────────────────────
