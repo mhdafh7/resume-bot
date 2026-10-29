@@ -1,0 +1,43 @@
+# Muhammed Aflah C P
+
+## Contact
+- phone: +91 7012832060
+- email: m.aflah@proton.me
+- website: mhdaflah.com
+- linkedin: linkedin.com/in/muhammed-aflah
+
+## Summary
+Full Stack Engineer with 3+ years of professional experience building highly complex, performant web applications using JavaScript, React and TypeScript. Proven track record collaborating closely with product designers to implement beautiful, accessible interfaces from Figma wireframes, designing robust client-side architecture, and contributing to open-source workflows.
+
+## Experience
+
+### Full Stack Engineer | Oct 2023 – Present | Hatio Innovations - BillDesk subsidiary | Kochi, Kerala
+- Built complex web applications and modern React/TypeScript frontends from scratch to serve a scalable network handling millions of daily data points.
+- Collaborated directly with product designers and developers in an agile, self-organizing environment to translate interactive Figma designs into accessible (WCAG 2.1 AA), highly performant web interfaces.
+- Partnered closely with backend and data engineers to architect, design, and implement resilient RESTful APIs, reducing integration overhead and strategic tech debt while deploying new product features.
+- Created highly reusable frontend libraries, atomic layout systems, and custom hook logic, achieving a solid code infrastructure optimized via granular testing configurations with Vitest and Playwright.
+- Spearheaded code quality initiatives and architecture design meetings, actively leading constructive peer code reviews and conducting collaborative technical pairing sessions to upskill the engineering culture.
+- Minimized tech debt during an application-wide system re-architecture, managing a major code migration from legacy structures to a modern React 19/Vite compiler pipeline, reducing compilation build speeds by 75%.
+- Instrumented proactive system health metrics using GitLab CI/CD, Sentry error monitoring, and SonarQube analytics, decreasing production runtime failures by 35% across distributed systems.
+
+### Software Engineer Intern | June 2023 – Sep 2023 | Enalo | Remote
+- Developed a full-stack browser extension and React application backed by Node.js/Express microservices, implementing synchronized web logic, custom state machines, and real-time RESTful API endpoints.
+- Successfully operated autonomously within a remote startup model to design and ship high-quality, lightweight components matching precise wireframe specifications under tight sprint deadlines.
+
+### Frontend Developer Intern | Mar 2023 – June 2023 | Fibo | Remote
+- Designed and authored a greenfield web platform using Next.js and Zustand, taking end-to-end ownership of frontend architecture, data optimization, and asset delivery to maximize initial page loading performance.
+- Dug into open-source documentation and framework layers to troubleshoot package discrepancies, introducing creative UI patterns through rapid collaborative prototyping sessions with designers.
+
+### Frontend Developer Intern | Oct 2022 – Jan 2023 | Leegality | Remote
+- Built custom JavaScript plugins and modular, accessible UI patterns for internal admin dashboards, building clean frontend controls from wireframe schematics and optimizing complex form state flows.
+
+## Skills
+- Frontend Ecosystem: JavaScript (ES6+), TypeScript, React, Next.js, Vue.js, HTML5, CSS3, DOM Architecture
+- Backend & Microservices: Node.js, Express.js, TypeScript Microservices, RESTful APIs, WebSockets, PostgreSQL
+- Design Systems & UI: Figma-to-Code Translation, Tailwind CSS, SASS/SCSS, Material UI, Web Accessibility (WCAG), Responsive Design
+- Testing Frameworks: Playwright, Cypress, Vitest, Jest, React Testing Library, Test Coverage Optimization
+- Tooling & Dev Infrastructure: Git Version Control, Docker, Vite, Webpack, GitLab CI/CD Pipelines, Sentry Monitoring, SonarQube
+
+## Education
+
+### Government Engineering College, Rajiv Gandhi Institute of Technology | Kottayam, Kerala | Bachelor of Technology in Electrical and Electronics Engineering (CS Equivalent Core) | Aug 2019 – May 2023

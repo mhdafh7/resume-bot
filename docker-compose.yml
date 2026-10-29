@@ -1,0 +1,32 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml – resume-bot
+# ──────────────────────────────────────────────────────────────────────────────
+version: "3.9"
+
+services:
+  resume-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: resume-bot:latest
+    container_name: resume-bot
+
+    # Restart automatically unless explicitly stopped
+    restart: unless-stopped
+
+    # Mount the .env file so secrets stay outside the image
+    env_file:
+      - .env
+
+    volumes:
+      # Edit the template without rebuilding the image
+      - ./resume_template.tex:/app/resume_template.tex:ro
+      # Persist resume_data.md across container restarts and updates
+      - ./data:/app/data
+
+    # Keep stdout/stderr for easy log inspection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

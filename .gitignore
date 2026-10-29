@@ -1,0 +1,50 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Git ignore rules for resume-bot
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Secrets — never commit
+.env
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# LaTeX compilation artefacts
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+
+# Generated PDFs (keep the template, drop outputs)
+*.pdf
+
+# Temporary compilation directories created by bot.py
+tmp_compile_*/
+
+# Bot state – personal data, never commit
+data/resume_data.md
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
