@@ -27,12 +27,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # ── System packages ───────────────────────────────────────────────────────────
 # texlive-latex-base           – minimal LaTeX kernel
-# texlive-latex-recommended    – common packages (geometry, enumitem, …)
+# texlive-latex-recommended    – common LaTeX packages
+# texlive-latex-extra          – template packages (fullpage, titlesec, enumitem)
 # texlive-fonts-recommended    – standard font sets
 # lmodern                      – Latin Modern fonts (lm*.tfm / lm*.pfb)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         texlive-latex-base \
         texlive-latex-recommended \
+        texlive-latex-extra \
         texlive-fonts-recommended \
         lmodern \
     && apt-get clean \
