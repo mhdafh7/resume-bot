@@ -11,9 +11,10 @@ WORKDIR /build
 # Install pip build tools
 RUN pip install --upgrade pip wheel
 
-# Copy and build wheels for all Python dependencies
-COPY requirements.txt .
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+# Build the reviewed, reproducible dependency set. requirements.txt remains the
+# short list of direct dependencies used when intentionally refreshing the lock.
+COPY requirements.txt requirements.lock ./
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.lock
 
 
 # ── Stage 2: Runtime image ────────────────────────────────────────────────────
