@@ -46,6 +46,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*.whl \
 # ── Application source ────────────────────────────────────────────────────────
 WORKDIR /app
 COPY bot.py .
+COPY resume_core.py .
 COPY resume_template.tex .
 
 # ── Run the bot ───────────────────────────────────────────────────────────────

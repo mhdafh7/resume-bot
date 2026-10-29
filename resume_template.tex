@@ -7,11 +7,11 @@
 % ── Pure skeleton ────────────────────────────────────────────────────────────
 % No personal content lives here.  The bot substitutes five placeholders:
 %
-%   %HEADING%            – \begin{center}…\end{center} block (Python-parsed)
-%   %SUMMARY%            – plain-text paragraph (LLM-tailored, LaTeX-escaped)
-%   %EXPERIENCE_SECTION% – \resumeSubheading entries (LLM-tailored)
-%   %SKILLS_SECTION%     – \small{\item{…}} block (LLM-tailored)
-%   %EDUCATION_SECTION%  – \resumeSubheading entries (Python-parsed)
+%   HEADING marker            – \begin{center}…\end{center} block
+%   SUMMARY marker            – validated plain text, LaTeX-escaped
+%   EXPERIENCE_SECTION marker – deterministic \resumeSubheading entries
+%   SKILLS_SECTION marker     – deterministic \small{\item{…}} rows
+%   EDUCATION_SECTION marker  – deterministic \resumeSubheading entries
 %-------------------------
 
 \documentclass[letterpaper,11pt]{article}
