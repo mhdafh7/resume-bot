@@ -9,6 +9,9 @@ services:
       dockerfile: Dockerfile
     image: resume-bot:latest
     container_name: resume-bot
+    # Avoid running the bot and pdflatex as root. Override these values in .env
+    # when the host account does not use the common 1000:1000 IDs.
+    user: "${RESUME_BOT_UID:-1000}:${RESUME_BOT_GID:-1000}"
 
     # Restart automatically unless explicitly stopped
     restart: unless-stopped
