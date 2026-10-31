@@ -1,13 +1,13 @@
 # resume-bot
 
-A private, single-user Telegram bot that builds a structured resume profile,
+A private, single-user Telegram bot that builds a structured resume fact pool,
 tailors it to a job description with Gemini, renders a fixed LaTeX template, and
 returns an ATS-readable PDF.
 
-The model does **not** write LaTeX. It returns a structured tailoring plan that
-can only select skills and experience bullets already present in the candidate's
-fact pool. Python validates that plan, escapes all text, and renders the final
-document deterministically.
+The model does **not** write LaTeX. It returns a schema-constrained tailoring plan
+whose rewritten bullets must cite source fact IDs. Python verifies the citations,
+numbers, role-specific technologies, content limits, and exact skill names before
+escaping and rendering the final document deterministically.
 
 ## How it works
 
@@ -19,10 +19,10 @@ validated local resume profile  +  job description
           |                              |
           +------------+-----------------+
                        v
-              Gemini JSON plan
+       Gemini provenance-aware JSON plan
                        |
                        v
-        source-fact and claim validation
+      provenance, claim, and size validation
                        |
                        v
           deterministic LaTeX rendering
@@ -118,6 +118,11 @@ Software Engineer Intern | Jan 2023 - Sep 2023 | Startup | Remote
 - Implemented REST APIs with Node.js and PostgreSQL.
 ```
 
+Use one atomic, verifiable fact per bullet. Include technologies, scale, and
+results when known, but never estimate a metric. The bot may rewrite a fact for
+clarity; it will reject new numbers and technologies that are absent from the
+cited source facts.
+
 ### Skills input
 
 ```text
@@ -143,16 +148,20 @@ validated and rewritten into a canonical format before it replaces stored data.
 After setup, paste a job description directly into the chat. The bot:
 
 1. Sends the profile fact pool and job description to Gemini.
-2. Requests JSON containing a summary, exact source skill names, and source
-   experience bullet indices.
-3. Rejects unknown skills, invalid bullet indices, and unsupported numeric claims.
-4. Preserves every employment role and falls back to source content when model
-   output fails validation.
-5. Escapes and renders all LaTeX locally with shell execution disabled.
-6. Returns the compiled PDF.
+2. Requests schema-constrained JSON containing a summary, exact source skill
+   names, and rewritten bullets with source fact IDs.
+3. Rejects unknown skills, cross-role citations, unsupported numeric claims,
+   role-specific technologies absent from cited facts, and oversized content.
+4. Preserves every employment role and enforces a six-bullet limit for the current
+   role, two bullets for earlier roles, and a 24-skill total limit.
+5. Uses job-description relevance to choose concise source facts when model output
+   fails validation; it never falls back to dumping the complete profile.
+6. Escapes and renders all LaTeX locally with shell execution disabled.
+7. Returns the compiled PDF.
 
-Gemini can still produce an inaccurate non-numeric summary claim. Review every
-generated resume before submitting it.
+Provenance checks substantially reduce unsupported claims, but they cannot prove
+that every non-numeric paraphrase is semantically perfect. Review every generated
+resume before submitting it.
 
 ## Commands
 
@@ -251,8 +260,9 @@ container and send `/setup` again.
 **The profile is rejected:** compare the experience and education separators with
 the examples above. Every experience needs at least one bullet.
 
-**Gemini output fails validation:** the bot retains safe source facts and notes the
-fallback in the PDF caption. Review container logs for the validation warning.
+**Gemini output fails validation:** the bot retains a concise, relevance-ranked
+subset of safe source facts and notes the fallback in the PDF caption. Review
+container logs for the validation warning.
 
 **PDF compilation fails:** inspect `docker compose logs resume-bot`. Detailed TeX
 diagnostics stay in logs rather than being sent through Telegram.

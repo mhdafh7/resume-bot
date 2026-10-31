@@ -4,6 +4,7 @@ from pathlib import Path
 
 from resume_core import (
     ResumeFormatError,
+    build_tailoring_prompt,
     default_tailoring_plan,
     latex_escape,
     parse_resume_markdown,
@@ -86,11 +87,40 @@ class TailoringValidationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.profile = parse_resume_markdown(SAMPLE_MARKDOWN)
 
-    def test_accepts_exact_source_selections_and_preserves_every_role(self) -> None:
+    def _all_roles_with_first_fact(self) -> list[dict[str, object]]:
+        return [
+            {
+                "role_index": role_index,
+                "bullets": [
+                    {
+                        "text": role.bullets[0],
+                        "source_fact_ids": [f"r{role_index}f0"],
+                    }
+                ],
+            }
+            for role_index, role in enumerate(self.profile.experience)
+        ]
+
+    def test_accepts_grounded_rewrites_and_preserves_every_role(self) -> None:
+        rewritten = (
+            "Reduced production runtime failures by 35% by instrumenting GitLab "
+            "CI/CD, Sentry, and SonarQube health metrics."
+        )
         response = json.dumps(
             {
                 "summary": "Full Stack Engineer with 3+ years of professional experience.",
-                "experience": [{"role_index": 0, "bullet_indices": [6, 0]}],
+                "experience": [
+                    {
+                        "role_index": 0,
+                        "bullets": [
+                            {
+                                "text": rewritten,
+                                "source_fact_ids": ["r0f6"],
+                            }
+                        ],
+                    },
+                    *self._all_roles_with_first_fact()[1:],
+                ],
                 "skills": [
                     {"category": "Frontend Ecosystem", "items": ["React", "TypeScript"]}
                 ],
@@ -99,27 +129,64 @@ class TailoringValidationTests(unittest.TestCase):
 
         plan = validate_tailoring_response(response, self.profile)
 
-        self.assertEqual(plan.experience[0].bullet_indices, (6, 0))
+        self.assertEqual(plan.experience[0].bullet_indices, (6,))
+        self.assertEqual(plan.experience[0].bullets[0].text, rewritten)
         self.assertEqual(len(plan.experience), len(self.profile.experience))
         self.assertEqual(plan.skills[0].items, ("React", "TypeScript"))
         self.assertFalse(plan.warnings)
 
-    def test_rejects_invented_skills_and_invalid_bullet_indices(self) -> None:
+    def test_rejects_invented_skills_and_unsupported_rewrite_claims(self) -> None:
         response = json.dumps(
             {
                 "summary": self.profile.summary,
-                "experience": [{"role_index": 0, "bullet_indices": [999]}],
+                "experience": [
+                    {
+                        "role_index": 0,
+                        "bullets": [
+                            {
+                                "text": "Scaled Rust services to 99 million users.",
+                                "source_fact_ids": ["r0f0"],
+                            }
+                        ],
+                    }
+                ],
                 "skills": [{"category": "Frontend Ecosystem", "items": ["Rust"]}],
             }
         )
 
         plan = validate_tailoring_response(response, self.profile)
 
-        self.assertEqual(
-            plan.experience[0].bullet_indices,
-            tuple(range(len(self.profile.experience[0].bullets))),
-        )
+        self.assertLessEqual(len(plan.experience[0].bullets), 6)
+        self.assertNotIn("99 million", plan.experience[0].bullets[0].text)
         self.assertNotIn("Rust", {item for group in plan.skills for item in group.items})
+        self.assertTrue(plan.warnings)
+
+    def test_rejects_a_job_keyword_absent_from_the_cited_role_fact(self) -> None:
+        response = json.dumps(
+            {
+                "summary": self.profile.summary,
+                "experience": [
+                    {
+                        "role_index": 0,
+                        "bullets": [
+                            {
+                                "text": "Built Kubernetes applications for a scalable network.",
+                                "source_fact_ids": ["r0f0"],
+                            }
+                        ],
+                    }
+                ],
+                "skills": [
+                    {"category": "Frontend Ecosystem", "items": ["React"]}
+                ],
+            }
+        )
+
+        plan = validate_tailoring_response(
+            response, self.profile, "Build Kubernetes applications at scale."
+        )
+
+        self.assertNotIn("Kubernetes", plan.experience[0].bullets[0].text)
         self.assertTrue(plan.warnings)
 
     def test_rejects_summary_with_an_unsupported_number(self) -> None:
@@ -136,13 +203,26 @@ class TailoringValidationTests(unittest.TestCase):
         self.assertEqual(plan.summary, self.profile.summary)
         self.assertIn("unsupported numeric claims", plan.warnings[0])
 
-    def test_invalid_json_falls_back_to_the_complete_source_profile(self) -> None:
-        plan = validate_tailoring_response("not-json", self.profile)
+    def test_invalid_json_uses_a_concise_relevance_ranked_fallback(self) -> None:
+        plan = validate_tailoring_response(
+            "not-json", self.profile, "React TypeScript accessibility frontend"
+        )
 
         self.assertEqual(plan.summary, self.profile.summary)
         self.assertEqual(len(plan.experience), len(self.profile.experience))
-        self.assertEqual(len(plan.skills), len(self.profile.skills))
+        self.assertLessEqual(len(plan.experience[0].bullets), 6)
+        self.assertTrue(
+            all(len(role.bullets) <= 2 for role in plan.experience[1:])
+        )
+        self.assertLessEqual(sum(len(group.items) for group in plan.skills), 24)
         self.assertTrue(plan.warnings)
+
+    def test_prompt_assigns_fact_ids_and_requests_provenance(self) -> None:
+        prompt = build_tailoring_prompt(self.profile, "React engineer")
+
+        self.assertIn('"fact_id": "r0f0"', prompt)
+        self.assertIn("source_fact_ids", prompt)
+        self.assertIn("Never add an outcome", prompt)
 
 
 if __name__ == "__main__":

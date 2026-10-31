@@ -67,13 +67,58 @@ MODEL_ID = os.getenv("GEMINI_MODEL", DEFAULT_MODEL_ID)
 ) = range(10)
 
 SYSTEM_PROMPT = """\
-You tailor resumes by selecting only facts supplied by the candidate.
+You are a precise technical resume editor.
 Return valid JSON only. Do not return Markdown or LaTeX.
-Never invent, combine, embellish, or rewrite a skill or experience bullet.
-Every source role must be represented by its role_index.
-The summary may be rewritten for relevance, but every claim must be supported by
-the source and every number must appear verbatim in the source.
+Rewrite only claims supported by the candidate's cited source facts. Every
+experience bullet must cite its source_fact_ids, and citations may only come from
+the same role. Never infer or estimate metrics, scale, ownership, technologies,
+leadership, business outcomes, or job-description keywords. Preserve source
+numbers exactly. Prefer concise achievements over fragmented duties. Every source
+role must be represented by its role_index.
 """
+
+TAILORING_RESPONSE_SCHEMA = {
+    "type": "object",
+    "required": ["summary", "experience", "skills"],
+    "properties": {
+        "summary": {"type": "string"},
+        "experience": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["role_index", "bullets"],
+                "properties": {
+                    "role_index": {"type": "integer"},
+                    "bullets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["text", "source_fact_ids"],
+                            "properties": {
+                                "text": {"type": "string"},
+                                "source_fact_ids": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "skills": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["category", "items"],
+                "properties": {
+                    "category": {"type": "string"},
+                    "items": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    },
+}
 
 
 def _required_environment() -> tuple[str, int, str]:
@@ -117,9 +162,10 @@ def tailor_with_llm(
             system_instruction=SYSTEM_PROMPT,
             max_output_tokens=4096,
             response_mime_type="application/json",
+            response_json_schema=TAILORING_RESPONSE_SCHEMA,
         ),
     )
-    return validate_tailoring_response(response.text or "", profile)
+    return validate_tailoring_response(response.text or "", profile, job_description)
 
 
 def compile_latex(profile: ResumeProfile, plan: TailoringPlan) -> tuple[bytes | None, str]:
@@ -307,9 +353,10 @@ async def setup_summary(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         SETUP_EXPERIENCE,
         "Send your experience in blocks like this:\n\n"
         "Job Title | Start - End | Company | Location\n"
-        "- Achievement or responsibility\n"
-        "- Another source fact\n\n"
-        "Repeat the block for each role.",
+        "- One atomic, verifiable achievement or responsibility\n"
+        "- What you built, how you built it, and the verified result\n\n"
+        "Repeat the block for each role. Include exact scale or metrics only when "
+        "you can verify them; never estimate numbers.",
     )
 
 
@@ -503,7 +550,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/deletedata confirm - permanently delete stored data\n"
         "/cancel - stop profile entry\n\n"
         "After setup, paste a job description directly into the chat. The bot sends "
-        "your profile and that description to Gemini, validates its fact selections, "
+        "your profile and that description to Gemini, validates every rewritten "
+        "bullet against cited source facts, "
         "renders LaTeX locally, and returns a PDF."
     )
 
@@ -529,7 +577,9 @@ async def handle_jd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lock = context.application.bot_data.get("generation_lock")
     if lock is None:
         lock = context.application.bot_data["generation_lock"] = asyncio.Lock()
-    status = await update.message.reply_text("Tailoring from your validated fact pool…")
+    status = await update.message.reply_text(
+        "Rewriting and ranking content from your validated fact pool…"
+    )
     async with lock:
         try:
             plan = await asyncio.to_thread(
@@ -556,9 +606,9 @@ async def handle_jd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     company = _infer_company(job_description)
     filename = f"{company}_Tailored_Resume.pdf" if company else "Tailored_Resume.pdf"
-    caption = "Tailored resume generated from validated source facts."
+    caption = "Tailored resume generated from provenance-checked source facts."
     if plan.warnings:
-        caption += " Some AI suggestions failed validation, so safe source content was retained."
+        caption += " Some AI suggestions failed validation, so concise source content was retained."
     await update.message.reply_document(
         document=io.BytesIO(pdf_bytes), filename=filename, caption=caption
     )

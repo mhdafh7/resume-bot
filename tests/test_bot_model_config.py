@@ -26,6 +26,8 @@ class ModelConfigurationTests(unittest.TestCase):
         bot.tailor_with_llm(client, profile, "A sufficiently detailed job description")
 
         self.assertIsNone(models.config.temperature)
+        self.assertEqual(models.config.response_mime_type, "application/json")
+        self.assertIn("source_fact_ids", str(models.config.response_json_schema))
 
 
 if __name__ == "__main__":

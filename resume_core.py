@@ -54,9 +54,26 @@ class ResumeProfile:
 
 
 @dataclass(frozen=True)
+class TailoredBullet:
+    text: str
+    source_fact_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ExperienceSelection:
     role_index: int
-    bullet_indices: tuple[int, ...]
+    bullets: tuple[TailoredBullet, ...]
+
+    @property
+    def bullet_indices(self) -> tuple[int, ...]:
+        """Return source indices for compatibility with older callers and exports."""
+        indices: list[int] = []
+        for bullet in self.bullets:
+            for fact_id in bullet.source_fact_ids:
+                match = re.fullmatch(rf"r{self.role_index}f(\d+)", fact_id)
+                if match:
+                    indices.append(int(match.group(1)))
+        return tuple(dict.fromkeys(indices))
 
 
 @dataclass(frozen=True)
@@ -71,6 +88,32 @@ class TailoringPlan:
     experience: tuple[ExperienceSelection, ...]
     skills: tuple[SkillSelection, ...]
     warnings: tuple[str, ...] = field(default_factory=tuple)
+
+
+CURRENT_ROLE_BULLET_LIMIT = 6
+EARLIER_ROLE_BULLET_LIMIT = 2
+TOTAL_SKILL_LIMIT = 24
+SKILLS_PER_CATEGORY_LIMIT = 8
+MAX_BULLET_CHARACTERS = 260
+MAX_SUMMARY_CHARACTERS = 520
+
+_WORD_RE = re.compile(r"[a-z0-9+#.]+", re.IGNORECASE)
+_NUMBER_RE = re.compile(r"(?<![\w.])\d+(?:[.,]\d+)*(?:%|\+|x)?", re.IGNORECASE)
+_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
+    "in", "is", "it", "of", "on", "or", "our", "that", "the", "their", "this",
+    "to", "using", "we", "with", "you", "your",
+}
+_COMMON_TECHNOLOGY_NAMES = {
+    "angular", "ansible", "aws", "azure", "cassandra", "cypress", "django", "docker",
+    "dynamodb", "elasticsearch", "express", "fastapi", "figma", "firebase", "flask",
+    "gatsby", "gcp", "git", "github", "gitlab", "go", "golang", "grafana", "graphql",
+    "java", "javascript", "jenkins", "jest", "kafka", "kotlin", "kubernetes", "linux",
+    "mongodb", "mysql", "next.js", "node.js", "nuxt", "oracle", "php", "playwright",
+    "postgres", "postgresql", "python", "rails", "react", "redis", "redux", "ruby",
+    "rust", "sentry", "snowflake", "sonarqube", "spring", "sql", "svelte", "swift",
+    "tailwind", "terraform", "typescript", "vite", "vitest", "vue", "webpack",
+}
 
 
 def _section_body(markdown: str, heading: str) -> str:
@@ -260,13 +303,17 @@ def render_education(profile: ResumeProfile) -> str:
 
 
 def render_experience(profile: ResumeProfile, plan: TailoringPlan) -> str:
-    selections = {item.role_index: item.bullet_indices for item in plan.experience}
+    selections = {item.role_index: item.bullets for item in plan.experience}
+    fallback = {
+        item.role_index: item.bullets
+        for item in default_tailoring_plan(profile).experience
+    }
     rendered: list[str] = []
     for role_index, role in enumerate(profile.experience):
-        indices = selections.get(role_index, tuple(range(len(role.bullets))))
+        selected_bullets = selections.get(role_index) or fallback[role_index]
         bullets = "\n".join(
-            f"        \\resumeItem{{{latex_escape(role.bullets[index])}}}"
-            for index in indices
+            f"        \\resumeItem{{{latex_escape(bullet.text)}}}"
+            for bullet in selected_bullets
         )
         rendered.append(
             "    \\resumeSubheading\n"
@@ -287,15 +334,104 @@ def render_skills(plan: TailoringPlan) -> str:
     )
 
 
-def default_tailoring_plan(profile: ResumeProfile, warning: str = "") -> TailoringPlan:
+def _fact_id(role_index: int, bullet_index: int) -> str:
+    return f"r{role_index}f{bullet_index}"
+
+
+def _normalise_text(value: str) -> str:
+    return " ".join(value.split()).strip()
+
+
+def _tokens(value: str) -> set[str]:
+    return {
+        token.casefold()
+        for token in _WORD_RE.findall(value)
+        if len(token) > 1 and token.casefold() not in _STOPWORDS
+    }
+
+
+def _relevance_score(text: str, job_description: str) -> int:
+    if not job_description:
+        return 0
+    text_tokens = _tokens(text)
+    target_tokens = _tokens(job_description)
+    overlap = text_tokens & target_tokens
+    exact_bonus = sum(
+        3
+        for token in text_tokens
+        if len(token) >= 4 and re.search(rf"(?<!\w){re.escape(token)}(?!\w)", job_description, re.I)
+    )
+    return len(overlap) + exact_bonus
+
+
+def _source_bullets_for_role(
+    role_index: int, role: Experience, job_description: str
+) -> tuple[TailoredBullet, ...]:
+    limit = CURRENT_ROLE_BULLET_LIMIT if role_index == 0 else EARLIER_ROLE_BULLET_LIMIT
+    ranked = sorted(
+        enumerate(role.bullets),
+        key=lambda item: (-_relevance_score(item[1], job_description), item[0]),
+    )[:limit]
+    return tuple(
+        TailoredBullet(text, (_fact_id(role_index, bullet_index),))
+        for bullet_index, text in ranked
+    )
+
+
+def _fallback_skills(
+    profile: ResumeProfile, job_description: str
+) -> tuple[SkillSelection, ...]:
+    ranked: list[tuple[int, int, int, str, str]] = []
+    for category_index, group in enumerate(profile.skills):
+        for item_index, item in enumerate(group.items):
+            ranked.append(
+                (
+                    _relevance_score(item, job_description),
+                    category_index,
+                    item_index,
+                    group.name,
+                    item,
+                )
+            )
+    ranked.sort(key=lambda item: (-item[0], item[1], item[2]))
+    chosen = ranked[:TOTAL_SKILL_LIMIT]
+    category_order = sorted(
+        {category for _, category, _, _, _ in chosen},
+        key=lambda category: (
+            -max(score for score, index, _, _, _ in chosen if index == category),
+            category,
+        ),
+    )
+    selected: list[SkillSelection] = []
+    for category_index in category_order:
+        group = profile.skills[category_index]
+        items = tuple(
+            item
+            for _, _, _, _, item in sorted(
+                (entry for entry in chosen if entry[1] == category_index),
+                key=lambda entry: (-entry[0], entry[2]),
+            )[:SKILLS_PER_CATEGORY_LIMIT]
+        )
+        if items:
+            selected.append(SkillSelection(group.name, items))
+    return tuple(selected)
+
+
+def default_tailoring_plan(
+    profile: ResumeProfile, warning: str = "", job_description: str = ""
+) -> TailoringPlan:
+    """Build a concise, deterministic plan when model output cannot be trusted."""
     warnings = (warning,) if warning else ()
     return TailoringPlan(
         summary=profile.summary,
         experience=tuple(
-            ExperienceSelection(index, tuple(range(len(role.bullets))))
+            ExperienceSelection(
+                index,
+                _source_bullets_for_role(index, role, job_description),
+            )
             for index, role in enumerate(profile.experience)
         ),
-        skills=tuple(SkillSelection(group.name, group.items) for group in profile.skills),
+        skills=_fallback_skills(profile, job_description),
         warnings=warnings,
     )
 
@@ -311,52 +447,152 @@ def _extract_json(raw: str) -> dict[str, Any]:
     return value
 
 
-def validate_tailoring_response(raw: str, profile: ResumeProfile) -> TailoringPlan:
-    """Accept only source-backed selections from a model JSON response."""
+def _numbers(value: str) -> set[str]:
+    return {number.casefold() for number in _NUMBER_RE.findall(value)}
+
+
+def _known_skills(profile: ResumeProfile) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            (item for group in profile.skills for item in group.items if len(item) >= 3),
+            key=len,
+            reverse=True,
+        )
+    )
+
+
+def _contains_phrase(value: str, phrase: str) -> bool:
+    return bool(
+        re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", value, re.IGNORECASE)
+    )
+
+
+def _target_technology_terms(job_description: str) -> tuple[str, ...]:
+    """Find technology-like capitalized terms that a model may copy from the JD."""
+    candidates = re.findall(r"(?<!\w)[A-Za-z][A-Za-z0-9.+#/-]{1,}(?!\w)", job_description)
+    terms = set()
+    for term in candidates:
+        folded = term.casefold()
+        has_technology_punctuation = bool(re.search(r"[.+#/]", term))
+        is_short_acronym = term.isupper() and 2 <= len(term) <= 10
+        if folded in _COMMON_TECHNOLOGY_NAMES or has_technology_punctuation or is_short_acronym:
+            terms.add(term)
+    return tuple(sorted(terms, key=len, reverse=True))
+
+
+def _validate_rewritten_bullet(
+    value: Any,
+    role_index: int,
+    profile: ResumeProfile,
+    job_description: str,
+) -> TailoredBullet | None:
+    if not isinstance(value, dict) or not isinstance(value.get("text"), str):
+        return None
+    text = _normalise_text(value["text"])
+    fact_ids = value.get("source_fact_ids")
+    if not text or len(text) > MAX_BULLET_CHARACTERS or not isinstance(fact_ids, list):
+        return None
+
+    fact_map = {
+        _fact_id(role_index, index): source
+        for index, source in enumerate(profile.experience[role_index].bullets)
+    }
+    valid_ids = tuple(
+        dict.fromkeys(
+            fact_id
+            for fact_id in fact_ids
+            if isinstance(fact_id, str) and fact_id in fact_map
+        )
+    )
+    if not valid_ids or len(valid_ids) != len(fact_ids):
+        return None
+
+    source = " ".join(fact_map[fact_id] for fact_id in valid_ids)
+    if not _numbers(text).issubset(_numbers(source)):
+        return None
+
+    for skill in _known_skills(profile):
+        if _contains_phrase(text, skill) and not _contains_phrase(source, skill):
+            return None
+    for term in _target_technology_terms(job_description):
+        if _contains_phrase(text, term) and not _contains_phrase(source, term):
+            return None
+
+    return TailoredBullet(text, valid_ids)
+
+
+def validate_tailoring_response(
+    raw: str, profile: ResumeProfile, job_description: str = ""
+) -> TailoringPlan:
+    """Accept concise rewrites only when they cite compatible source facts."""
     try:
         data = _extract_json(raw)
     except (ValueError, json.JSONDecodeError) as exc:
-        return default_tailoring_plan(profile, f"Invalid AI response: {exc}")
+        return default_tailoring_plan(
+            profile, f"Invalid AI response: {exc}", job_description
+        )
 
     warnings: list[str] = []
     proposed_summary = data.get("summary")
     summary = proposed_summary.strip() if isinstance(proposed_summary, str) else ""
-    source_numbers = set(re.findall(r"\d+(?:\.\d+)?%?\+?", profile_to_markdown(profile)))
-    summary_numbers = set(re.findall(r"\d+(?:\.\d+)?%?\+?", summary))
-    if not summary or not summary_numbers.issubset(source_numbers):
-        warnings.append("AI summary was empty or introduced unsupported numeric claims.")
+    source_numbers = _numbers(profile_to_markdown(profile))
+    summary_numbers = _numbers(summary)
+    if (
+        not summary
+        or len(summary) > MAX_SUMMARY_CHARACTERS
+        or not summary_numbers.issubset(source_numbers)
+    ):
+        warnings.append(
+            "AI summary was empty, too long, or introduced unsupported numeric claims."
+        )
         summary = profile.summary
 
-    requested_roles: dict[int, tuple[int, ...]] = {}
+    fallback = default_tailoring_plan(profile, job_description=job_description)
+    fallback_roles = {item.role_index: item.bullets for item in fallback.experience}
+    requested_roles: dict[int, tuple[TailoredBullet, ...]] = {}
     role_data = data.get("experience")
     if isinstance(role_data, list):
         for selection in role_data:
             if not isinstance(selection, dict):
                 continue
             role_index = selection.get("role_index")
-            bullet_indices = selection.get("bullet_indices")
             if not isinstance(role_index, int) or not 0 <= role_index < len(profile.experience):
                 continue
-            if not isinstance(bullet_indices, list):
+            proposed_bullets = selection.get("bullets")
+            if not isinstance(proposed_bullets, list):
                 continue
-            valid = tuple(
-                dict.fromkeys(
-                    index
-                    for index in bullet_indices
-                    if isinstance(index, int)
-                    and 0 <= index < len(profile.experience[role_index].bullets)
-                )
+            limit = (
+                CURRENT_ROLE_BULLET_LIMIT
+                if role_index == 0
+                else EARLIER_ROLE_BULLET_LIMIT
             )
+            valid_list: list[TailoredBullet] = []
+            seen_text: set[str] = set()
+            for value in proposed_bullets:
+                bullet = _validate_rewritten_bullet(
+                    value, role_index, profile, job_description
+                )
+                if bullet and bullet.text.casefold() not in seen_text:
+                    valid_list.append(bullet)
+                    seen_text.add(bullet.text.casefold())
+                if len(valid_list) == limit:
+                    break
+            valid = tuple(valid_list)
             if valid:
                 requested_roles[role_index] = valid
 
     experience = tuple(
         ExperienceSelection(
             index,
-            requested_roles.get(index, tuple(range(len(role.bullets)))),
+            requested_roles.get(index, fallback_roles[index]),
         )
-        for index, role in enumerate(profile.experience)
+        for index, _ in enumerate(profile.experience)
     )
+    if len(requested_roles) != len(profile.experience):
+        warnings.append(
+            "One or more AI experience rewrites failed provenance checks; "
+            "concise source facts were retained."
+        )
 
     source_categories = {group.name.casefold(): group for group in profile.skills}
     selected_skills: list[SkillSelection] = []
@@ -377,16 +613,30 @@ def validate_tailoring_response(raw: str, profile: ResumeProfile) -> TailoringPl
                 )
             )
             if items:
-                selected_skills.append(SkillSelection(source.name, items))
+                selected_skills.append(
+                    SkillSelection(source.name, items[:SKILLS_PER_CATEGORY_LIMIT])
+                )
+            if sum(len(group.items) for group in selected_skills) >= TOTAL_SKILL_LIMIT:
+                break
     if not selected_skills:
-        warnings.append("AI skill selection was invalid; all source skills were retained.")
-        selected_skills = [SkillSelection(group.name, group.items) for group in profile.skills]
+        warnings.append("AI skill selection was invalid; relevant source skills were retained.")
+        selected_skills = list(fallback.skills)
 
-    return TailoringPlan(summary, experience, tuple(selected_skills), tuple(warnings))
+    remaining = TOTAL_SKILL_LIMIT
+    bounded_skills: list[SkillSelection] = []
+    for group in selected_skills:
+        items = group.items[:remaining]
+        if items:
+            bounded_skills.append(SkillSelection(group.category, items))
+            remaining -= len(items)
+        if remaining == 0:
+            break
+
+    return TailoringPlan(summary, experience, tuple(bounded_skills), tuple(warnings))
 
 
 def build_tailoring_prompt(profile: ResumeProfile, job_description: str) -> str:
-    """Build a compact, index-addressable fact-selection prompt."""
+    """Build a provenance-addressable rewriting prompt."""
     roles = [
         {
             "role_index": role_index,
@@ -394,8 +644,8 @@ def build_tailoring_prompt(profile: ResumeProfile, job_description: str) -> str:
             "dates": role.dates,
             "company": role.company,
             "location": role.location,
-            "bullets": [
-                {"bullet_index": bullet_index, "text": bullet}
+            "source_facts": [
+                {"fact_id": _fact_id(role_index, bullet_index), "text": bullet}
                 for bullet_index, bullet in enumerate(role.bullets)
             ],
         }
@@ -412,10 +662,18 @@ def build_tailoring_prompt(profile: ResumeProfile, job_description: str) -> str:
         f"{json.dumps(source, ensure_ascii=False, indent=2)}\n\n"
         "TARGET JOB DESCRIPTION:\n"
         f"{job_description}\n\n"
-        "Return one JSON object with keys: summary, experience, skills. "
-        "summary is a concise 2-3 sentence rewrite using only source facts. "
-        "experience is a list of objects with role_index and an ordered list of "
-        "bullet_indices; include relevant bullets only, but include every role. "
-        "skills is an ordered list of objects with an exact source category and "
-        "an ordered list of exact source items. Never invent or rewrite a fact."
+        "Return one JSON object with keys summary, experience, and skills. "
+        "Write a concise two-sentence summary using only supported source facts. "
+        "Experience must contain every role. Each role object has role_index and "
+        "bullets. Each bullet has text and source_fact_ids. Rewrite source facts "
+        "into clear achievement statements, but preserve their meaning exactly. "
+        "A rewritten bullet may cite one or more facts from the same role. Never "
+        "add an outcome, metric, technology, scope, leadership claim, or keyword "
+        "that is not present in its cited facts. Preserve every number exactly. "
+        f"Use at most {CURRENT_ROLE_BULLET_LIMIT} bullets for role 0 and at most "
+        f"{EARLIER_ROLE_BULLET_LIMIT} bullets for each earlier role; prioritize "
+        "relevance and impact over duties. Keep each bullet under 260 characters. "
+        "Skills is an ordered list of objects with an exact source category and "
+        "an ordered list of exact source items; include at most 24 skills. Do not "
+        "copy unsupported keywords merely because they appear in the job description."
     )
