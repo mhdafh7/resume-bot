@@ -90,7 +90,24 @@ docker compose logs -f resume-bot
 
 The first build installs TeX Live and can take several minutes.
 
-## First-time setup
+## Using the bot
+
+### Typical workflow
+
+1. Open the bot chat in Telegram and type `/` to open the command menu.
+2. Send `/start`. If no profile exists, the bot begins guided setup; otherwise it
+   reports that it is ready.
+3. Complete setup, or use `/setresume` to import a complete Markdown profile.
+4. Paste the full job description as a normal message. Do not prefix it with a
+   command.
+5. Wait while the bot tailors, validates, renders, and compiles the resume.
+6. Download the returned PDF and review every claim before applying.
+7. Paste another job description whenever you need another tailored version.
+
+The bot accepts messages only from `TELEGRAM_ALLOWED_USER_ID`. Other Telegram
+accounts receive no resume data or command output.
+
+### First-time profile setup
 
 Open the bot in Telegram and send `/start`. When no profile exists, the bot
 automatically begins a guided conversation for:
@@ -103,9 +120,9 @@ automatically begins a guided conversation for:
 
 The bot validates the completed profile before saving it. Use `/cancel` to stop
 without saving. Use `/setup` later to replace the profile through the same guided
-flow.
+flow. A replacement is saved only after the final education answer validates.
 
-### Experience input
+#### Experience input
 
 Send one or more blocks in this format:
 
@@ -123,7 +140,7 @@ results when known, but never estimate a metric. The bot may rewrite a fact for
 clarity; it will reject new numbers and technologies that are absent from the
 cited source facts.
 
-### Skills input
+#### Skills input
 
 ```text
 Frontend: TypeScript, React, Next.js, CSS
@@ -131,7 +148,7 @@ Backend: Node.js, PostgreSQL, REST APIs
 Tooling: Git, Docker, Playwright
 ```
 
-### Education input
+#### Education input
 
 ```text
 Institution | Location | Degree | Start - End
@@ -142,6 +159,8 @@ Institution | Location | Degree | Start - End
 `/setresume` imports the human-editable format documented in
 [`resume_data.md.example`](resume_data.md.example). The complete document is
 validated and rewritten into a canonical format before it replaces stored data.
+After sending `/setresume`, paste the entire Markdown document in the next message.
+Use `/cancel` if you decide not to replace the profile.
 
 ## Tailoring a resume
 
@@ -165,6 +184,10 @@ resume before submitting it.
 
 ## Commands
 
+The bot publishes this command list to Telegram at startup, so supported commands
+appear in slash-command autocomplete after the service connects. If the menu does
+not appear after an update, restart the service and reopen the Telegram chat.
+
 | Command | Purpose |
 | --- | --- |
 | `/start` | Start guided setup or show ready status |
@@ -177,6 +200,18 @@ resume before submitting it.
 | `/help` | Show the in-bot command guide |
 
 `/clearresume confirm` remains as a compatibility alias for deletion.
+
+### Reviewing and managing stored data
+
+- `/showresume` displays the profile in chat when it is short, or sends it as a
+  Markdown file when it is too long for one message.
+- `/exportdata` always downloads the canonical Markdown profile. Edit that file
+  locally and import the complete updated version with `/setresume`.
+- `/setup` replaces the profile through the guided conversation.
+- `/cancel` abandons an active `/setup` or `/setresume` conversation without
+  replacing the saved profile.
+- `/deletedata` only displays the confirmation instructions. Send
+  `/deletedata confirm` to permanently remove `data/resume_data.md`.
 
 ## Privacy and security
 
@@ -220,6 +255,7 @@ resume_core.py            Domain parser, validation, deterministic renderer
 resume_template.tex       Fixed LaTeX document and formatting macros
 resume_data.md.example    Advanced import example
 tests/test_resume_core.py Core regression tests
+tests/test_bot_commands.py Telegram command-menu regression test
 requirements.txt          Direct Python dependencies
 requirements.lock         Verified transitive dependency versions
 Dockerfile                Python 3.12 and TeX Live runtime

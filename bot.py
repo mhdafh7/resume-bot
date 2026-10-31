@@ -15,7 +15,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -120,6 +120,17 @@ TAILORING_RESPONSE_SCHEMA = {
     },
 }
 
+BOT_COMMANDS = (
+    BotCommand("start", "Start setup or show bot status"),
+    BotCommand("setup", "Create or replace your resume profile"),
+    BotCommand("setresume", "Import a complete Markdown resume"),
+    BotCommand("showresume", "Review your stored resume data"),
+    BotCommand("exportdata", "Download your stored resume data"),
+    BotCommand("help", "Show the command guide"),
+    BotCommand("cancel", "Cancel the current profile entry"),
+    BotCommand("deletedata", "Show how to delete stored resume data"),
+)
+
 
 def _required_environment() -> tuple[str, int, str]:
     names = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USER_ID", "GEMINI_API_KEY")
@@ -131,6 +142,11 @@ def _required_environment() -> tuple[str, int, str]:
     except ValueError as exc:
         raise RuntimeError("TELEGRAM_ALLOWED_USER_ID must be an integer.") from exc
     return os.environ["TELEGRAM_BOT_TOKEN"], allowed_user_id, os.environ["GEMINI_API_KEY"]
+
+
+async def register_bot_commands(application: Application) -> None:
+    """Publish the command menu used by Telegram's slash-command autocomplete."""
+    await application.bot.set_my_commands(BOT_COMMANDS)
 
 
 def load_resume_markdown() -> str | None:
@@ -633,7 +649,12 @@ def main() -> None:
     token, allowed_user_id, api_key = _required_environment()
     logger.info("Starting Resume Bot for configured user ID %d", allowed_user_id)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    application = Application.builder().token(token).build()
+    application = (
+        Application.builder()
+        .token(token)
+        .post_init(register_bot_commands)
+        .build()
+    )
     application.bot_data["genai_client"] = genai.Client(api_key=api_key)
     conversation = ConversationHandler(
         entry_points=[
