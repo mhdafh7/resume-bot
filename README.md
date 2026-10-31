@@ -69,6 +69,17 @@ The container defaults to UID/GID `1000:1000`. If your host account uses
 different IDs, set `RESUME_BOT_UID` and `RESUME_BOT_GID` in `.env` so the bot
 can write to `./data` without running as root.
 
+Make sure the bind-mounted data directory is owned by that same UID/GID before
+starting the container. For the default IDs:
+
+```bash
+mkdir -p data
+sudo chown -R 1000:1000 data
+chmod u+rwx data
+```
+
+If you override the IDs, use those values in the `chown` command instead.
+
 Build and start the bot:
 
 ```bash
@@ -230,6 +241,12 @@ docker compose down
 
 **The bot does not respond:** confirm the service is running and that
 `TELEGRAM_ALLOWED_USER_ID` matches the account sending messages.
+
+**Setup stops after education with `PermissionError` for
+`/app/data/resume_data.md`:** the host `./data` directory is not writable by the
+container UID/GID. Apply the ownership commands from Installation using the
+values configured by `RESUME_BOT_UID` and `RESUME_BOT_GID`, then restart the
+container and send `/setup` again.
 
 **The profile is rejected:** compare the experience and education separators with
 the examples above. Every experience needs at least one bullet.

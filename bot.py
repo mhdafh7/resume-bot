@@ -387,6 +387,15 @@ async def setup_education(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "Please send the education entry again, or /cancel and restart /setup."
         )
         return SETUP_EDUCATION
+    except OSError:
+        logger.exception("Could not save the guided resume profile")
+        await update.message.reply_text(
+            "I could not save your profile because the bot's data directory is not "
+            "writable. Your setup answers are still available in this running session. "
+            "Fix the server-side data directory permissions, then send the education "
+            "entry again."
+        )
+        return SETUP_EDUCATION
     context.user_data.pop("setup", None)
     await update.message.reply_text(
         "Your structured resume profile is saved. Paste a job description whenever "
@@ -412,6 +421,14 @@ async def cmd_setresume_receive(update: Update, context: ContextTypes.DEFAULT_TY
         profile = save_resume_markdown(update.message.text)
     except ResumeFormatError as exc:
         await update.message.reply_text(f"The resume is not valid yet: {exc}")
+        return AWAITING_RESUME
+    except OSError:
+        logger.exception("Could not save the imported resume profile")
+        await update.message.reply_text(
+            "I could not save the resume because the bot's data directory is not "
+            "writable. Fix the server-side data directory permissions, then send the "
+            "resume again."
+        )
         return AWAITING_RESUME
     await update.message.reply_text(
         f"Resume for {profile.name} saved and validated. Now send a job description."
