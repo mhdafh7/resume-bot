@@ -4,6 +4,7 @@ from pathlib import Path
 
 from resume_core import (
     ResumeFormatError,
+    build_tailoring_coverage_report,
     build_tailoring_prompt,
     default_tailoring_plan,
     latex_escape,
@@ -109,6 +110,7 @@ class TailoringValidationTests(unittest.TestCase):
         response = json.dumps(
             {
                 "summary": "Full Stack Engineer with 3+ years of professional experience.",
+                "summary_source_fact_ids": ["s0"],
                 "experience": [
                     {
                         "role_index": 0,
@@ -139,6 +141,7 @@ class TailoringValidationTests(unittest.TestCase):
         response = json.dumps(
             {
                 "summary": self.profile.summary,
+                "summary_source_fact_ids": ["s0"],
                 "experience": [
                     {
                         "role_index": 0,
@@ -165,6 +168,7 @@ class TailoringValidationTests(unittest.TestCase):
         response = json.dumps(
             {
                 "summary": self.profile.summary,
+                "summary_source_fact_ids": ["s0"],
                 "experience": [
                     {
                         "role_index": 0,
@@ -193,6 +197,7 @@ class TailoringValidationTests(unittest.TestCase):
         response = json.dumps(
             {
                 "summary": "Improved every system by 99%.",
+                "summary_source_fact_ids": ["s0"],
                 "experience": [],
                 "skills": [],
             }
@@ -201,7 +206,106 @@ class TailoringValidationTests(unittest.TestCase):
         plan = validate_tailoring_response(response, self.profile)
 
         self.assertEqual(plan.summary, self.profile.summary)
-        self.assertIn("unsupported numeric claims", plan.warnings[0])
+        self.assertIn("unsupported claims", plan.warnings[0])
+
+    def test_rejects_an_uncited_summary(self) -> None:
+        response = json.dumps(
+            {
+                "summary": "Frontend engineer specializing in healthcare systems.",
+                "experience": self._all_roles_with_first_fact(),
+                "skills": [],
+            }
+        )
+
+        plan = validate_tailoring_response(response, self.profile)
+
+        self.assertEqual(plan.summary, self.profile.summary)
+        self.assertEqual(plan.summary_source_fact_ids, ("s0",))
+        self.assertIn("missing valid citations", plan.warnings[0])
+
+    def test_keeps_every_source_backed_skill_explicitly_requested_by_the_jd(self) -> None:
+        profile = parse_resume_markdown(
+            SAMPLE_MARKDOWN.replace(
+                "HTML5, CSS3, DOM Architecture",
+                "HTML5, CSS3, DOM Architecture, Zustand",
+            ).replace(
+                "Web Accessibility (WCAG), Responsive Design",
+                "Web Accessibility (WCAG), Responsive Design, Web Performance",
+            )
+        )
+        job_description = (
+            "Develop responsive applications using JavaScript, React, HTML, and CSS. "
+            "Implement state management solutions. Tailwind CSS and TypeScript are a plus. "
+            "Build modular applications and optimize application performance."
+        )
+        response = json.dumps(
+            {
+                "summary": self.profile.summary,
+                "summary_source_fact_ids": ["s0"],
+                "experience": [
+                    {
+                        "role_index": role_index,
+                        "bullets": [
+                            {
+                                "text": role.bullets[0],
+                                "source_fact_ids": [f"r{role_index}f0"],
+                            }
+                        ],
+                    }
+                    for role_index, role in enumerate(profile.experience)
+                ],
+                "skills": [
+                    {"category": "Frontend Ecosystem", "items": ["React"]}
+                ],
+            }
+        )
+
+        plan = validate_tailoring_response(response, profile, job_description)
+        selected = {item for group in plan.skills for item in group.items}
+
+        self.assertTrue(
+            {
+                "JavaScript (ES6+)",
+                "React",
+                "TypeScript",
+                "HTML5",
+                "CSS3",
+                "Zustand",
+                "Tailwind CSS",
+                "Responsive Design",
+                "Web Performance",
+            }.issubset(selected)
+        )
+
+    def test_orders_valid_bullets_by_jd_coverage_then_impact(self) -> None:
+        role = self.profile.experience[0]
+        response = json.dumps(
+            {
+                "summary": self.profile.summary,
+                "summary_source_fact_ids": ["s0"],
+                "experience": [
+                    {
+                        "role_index": 0,
+                        "bullets": [
+                            {"text": role.bullets[6], "source_fact_ids": ["r0f6"]},
+                            {"text": role.bullets[5], "source_fact_ids": ["r0f5"]},
+                        ],
+                    },
+                    *self._all_roles_with_first_fact()[1:],
+                ],
+                "skills": [
+                    {"category": "Frontend Ecosystem", "items": ["React"]}
+                ],
+            }
+        )
+
+        plan = validate_tailoring_response(
+            response,
+            self.profile,
+            "Build React and TypeScript interfaces and optimize frontend performance.",
+        )
+
+        self.assertEqual(plan.experience[0].bullet_indices[0], 5)
 
     def test_invalid_json_uses_a_concise_relevance_ranked_fallback(self) -> None:
         plan = validate_tailoring_response(
@@ -221,8 +325,28 @@ class TailoringValidationTests(unittest.TestCase):
         prompt = build_tailoring_prompt(self.profile, "React engineer")
 
         self.assertIn('"fact_id": "r0f0"', prompt)
+        self.assertIn('"fact_id": "s0"', prompt)
         self.assertIn("source_fact_ids", prompt)
+        self.assertIn("summary_source_fact_ids", prompt)
+        self.assertIn("supported requirement coverage", prompt)
         self.assertIn("Never add an outcome", prompt)
+
+    def test_coverage_report_shows_matches_and_source_gaps(self) -> None:
+        job_description = (
+            "Build responsive React interfaces with Tailwind CSS and Redux. "
+            "Own features from conception to deployment."
+        )
+        plan = default_tailoring_plan(self.profile, job_description=job_description)
+
+        report = build_tailoring_coverage_report(
+            self.profile, plan, job_description
+        )
+
+        self.assertIn("Matched JD skills", report)
+        self.assertIn("React", report)
+        self.assertIn("Tailwind CSS", report)
+        self.assertIn("feature ownership", report)
+        self.assertIn("redux", report)
 
 
 if __name__ == "__main__":

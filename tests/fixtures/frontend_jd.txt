@@ -1,0 +1,22 @@
+Job Title: Frontend Engineer
+Location: Bengaluru (on-site)
+Job Type: Full-Time
+About the team
+We build web applications and developer tooling for enterprise products. Our team focuses on accessible interfaces, reliable workflows, and maintainable frontend architecture.
+Role Overview: As a Frontend Engineer, you will design and implement high-quality user interfaces. You will work closely with designers, product managers, and backend engineers to deliver useful, reliable features and solve complex frontend challenges.
+Key Responsibilities:
+* Develop responsive and user-centric web applications using JavaScript, React, HTML, and CSS.
+* Implement state management solutions to ensure smooth and efficient application performance.
+* Collaborate with cross-functional teams to define, design, and ship new features.
+* Write clean, modular, and scalable code, with a focus on maintainability.
+* Take ownership of projects from conception to deployment, ensuring high-quality standards are met.
+* Dive deep into existing codebases and libraries, enhancing and optimising where necessary.
+* Stay up-to-date with the latest industry trends and best practices in frontend development.
+Requirements:
+* Proficiency in JavaScript and React; solid understanding of HTML and CSS.
+* Experience with state management libraries.
+* Familiarity with Tailwind CSS and TypeScript is a plus.
+* Ability to build features from scratch, focusing on modularity and scalability.
+* Strong problem-solving skills and a curiosity to understand complex systems.
+* Excellent communication skills and a collaborative mindset.
+Experience Required: 2 -3 years

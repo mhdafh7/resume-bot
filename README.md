@@ -5,9 +5,11 @@ tailors it to a job description with Gemini, renders a fixed LaTeX template, and
 returns an ATS-readable PDF.
 
 The model does **not** write LaTeX. It returns a schema-constrained tailoring plan
-whose rewritten bullets must cite source fact IDs. Python verifies the citations,
-numbers, role-specific technologies, content limits, and exact skill names before
-escaping and rendering the final document deterministically.
+whose summary and rewritten bullets must cite source fact IDs. Python verifies the
+citations, numbers, role-specific technologies, content limits, and exact skill
+names before escaping and rendering the final document deterministically. A
+deterministic coverage pass restores every source-backed skill explicitly requested
+by the job description, even if the model omits it.
 
 ## How it works
 
@@ -175,12 +177,28 @@ After setup, paste a job description directly into the chat. The bot:
    names, and rewritten bullets with source fact IDs.
 3. Rejects unknown skills, cross-role citations, unsupported numeric claims,
    role-specific technologies absent from cited facts, and oversized content.
-4. Preserves every employment role and enforces a six-bullet limit for the current
-   role, two bullets for earlier roles, and a 24-skill total limit.
-5. Uses job-description relevance to choose concise source facts when model output
-   fails validation; it never falls back to dumping the complete profile.
-6. Escapes and renders all LaTeX locally with shell execution disabled.
-7. Returns the compiled PDF.
+4. Guarantees that source-backed JD skills survive selection, including common
+   equivalents such as `HTML`/`HTML5` and `state management`/`Zustand`.
+5. Ranks facts using literal matches plus frontend concepts such as state management,
+   responsive UI, modularity, ownership, collaboration, and performance.
+6. Preserves every employment role and enforces a six-bullet limit for the current
+   role and two bullets for earlier roles. Eight skills per category and 24 total
+   are targets for optional skills; source-backed JD matches take precedence.
+7. Ranks achievements using their source evidence and considers relevant facts
+   omitted by the model. Conservatively restores original wording when a rewrite
+   loses substantive source terms; paraphrase equivalence is not inferred. Original
+   project labels and common stopwords may be removed. Relevant terms in the source
+   summary are preserved. Rewritten bullets can use up to 600 characters; trusted
+   original facts may be longer. Shorter wording is preferred only when evidence survives.
+8. Escapes and renders all LaTeX locally with shell execution disabled.
+9. Returns the compiled PDF followed by a coverage report separating listed skills
+   from phrase matches in experience. It reports omitted source fact IDs and themes,
+   and requirements without matching experience evidence. Phrase matches are
+   indicators for review, not proof that a requirement is satisfied.
+
+The evidence-retention check is deliberately conservative: it can restore an
+original even when a paraphrase is equivalent. Bullet limits still apply, and
+longer retained evidence can produce more than one PDF page.
 
 Provenance checks substantially reduce unsupported claims, but they cannot prove
 that every non-numeric paraphrase is semantically perfect. Review every generated

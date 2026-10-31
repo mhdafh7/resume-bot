@@ -1,0 +1,22 @@
+{
+  "summary": "Software Engineer with 3+ years of experience building scalable frontend platforms, design systems, embeddable SDKs, and payment products using React, Next.js, Vue.js, and TypeScript. Experienced across microfrontend architecture, application modernization, web performance, accessibility, automated testing, and observability.",
+  "summary_source_fact_ids": ["s0", "r0f1"],
+  "experience": [
+    {"role_index": 0, "bullets": [
+      {"text": "Architected an enterprise Design Language System and reusable component library documented with Storybook and tested with Vitest and Playwright, accelerating cross-team feature delivery by 40%.", "source_fact_ids": ["r0f2"]},
+      {"text": "Led the migration of a legacy Angular 9 admin panel to a React 19 and TypeScript operations dashboard with Vite, reducing production asset build times by 75% while translating complex operational workflows and large datasets.", "source_fact_ids": ["r0f3"]},
+      {"text": "Built a Vite-powered microfrontend host unifying applications behind single sign-on, establishing shared authentication and navigation contracts, lazy loading, and error boundaries while preserving isolated builds.", "source_fact_ids": ["r0f0"]},
+      {"text": "Developed a secure Vue.js payment SDK serving 2,000+ merchants processing millions of transactions daily, implementing WCAG 2.1 AA accessibility and responsive, cross-platform layouts.", "source_fact_ids": ["r0f1"]},
+      {"text": "Integrated Sentry error tracking and source maps alongside SonarQube quality gates and GitLab CI/CD deployment checks, reducing production frontend crashes by 35%.", "source_fact_ids": ["r0f5"]},
+      {"text": "Built frontend workflows for an ONDC-powered ticket-booking system using long polling to surface search, availability, and booking-status updates in near real time.", "source_fact_ids": ["r0f4"]}
+    ]},
+    {"role_index": 1, "bullets": [{"text": "Built a browser extension using Node.js and Express synchronization to maintain consistent real-time state across browser contexts.", "source_fact_ids": ["r1f0"]}]},
+    {"role_index": 2, "bullets": [{"text": "Spearheaded customer and admin interfaces for a gym-management platform using Next.js and SCSS, delivering booking and management workflows and integrating payment SDK checkout.", "source_fact_ids": ["r2f0"]}]},
+    {"role_index": 3, "bullets": [{"text": "Developed an embeddable rich-text-editor JavaScript plugin supporting secure document workflows inside third-party dashboards.", "source_fact_ids": ["r3f0"]}]}
+  ],
+  "skills": [
+    {"category": "Frontend", "items": ["React", "Next.js", "Vue.js", "JavaScript (ES6+)", "TypeScript", "Zustand", "HTML5", "CSS3"]},
+    {"category": "Architecture & UX", "items": ["Microfrontends", "Single Sign-On Integration", "Design Systems", "Component Libraries", "Responsive Design", "Web Accessibility (WCAG 2.1 AA)", "Web Performance"]},
+    {"category": "Testing & Quality", "items": ["Playwright", "Vitest", "Cypress", "Jest", "React Testing Library", "Storybook"]}
+  ]
+}

@@ -29,6 +29,7 @@ from resume_core import (
     ResumeFormatError,
     ResumeProfile,
     TailoringPlan,
+    build_tailoring_coverage_report,
     build_tailoring_prompt,
     latex_escape,
     parse_resume_markdown,
@@ -71,17 +72,23 @@ You are a precise technical resume editor.
 Return valid JSON only. Do not return Markdown or LaTeX.
 Rewrite only claims supported by the candidate's cited source facts. Every
 experience bullet must cite its source_fact_ids, and citations may only come from
-the same role. Never infer or estimate metrics, scale, ownership, technologies,
-leadership, business outcomes, or job-description keywords. Preserve source
-numbers exactly. Prefer concise achievements over fragmented duties. Every source
-role must be represented by its role_index.
+the same role. The summary must cite summary_source_fact_ids. Never infer or
+estimate metrics, scale, ownership, technologies, leadership, business outcomes,
+or job-description keywords. Preserve source numbers exactly. Cover every
+source-backed skill explicitly requested by the job description, then prefer
+concise achievements over fragmented duties. Every source role must be represented
+by its role_index.
 """
 
 TAILORING_RESPONSE_SCHEMA = {
     "type": "object",
-    "required": ["summary", "experience", "skills"],
+    "required": ["summary", "summary_source_fact_ids", "experience", "skills"],
     "properties": {
         "summary": {"type": "string"},
+        "summary_source_fact_ids": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
         "experience": {
             "type": "array",
             "items": {
@@ -623,9 +630,12 @@ async def handle_jd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     filename = _build_resume_filename(profile, job_description)
     caption = "Tailored resume generated from provenance-checked source facts."
     if plan.warnings:
-        caption += " Some AI suggestions failed validation, so concise source content was retained."
+        caption += " Original source content was retained where needed to protect accuracy or relevant detail."
     await update.message.reply_document(
         document=io.BytesIO(pdf_bytes), filename=filename, caption=caption
+    )
+    await update.message.reply_text(
+        build_tailoring_coverage_report(profile, plan, job_description)
     )
     await status.delete()
 

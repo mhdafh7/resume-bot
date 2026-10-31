@@ -28,6 +28,9 @@ class ModelConfigurationTests(unittest.TestCase):
         self.assertIsNone(models.config.temperature)
         self.assertEqual(models.config.response_mime_type, "application/json")
         self.assertIn("source_fact_ids", str(models.config.response_json_schema))
+        self.assertIn(
+            "summary_source_fact_ids", str(models.config.response_json_schema)
+        )
 
 
 if __name__ == "__main__":
