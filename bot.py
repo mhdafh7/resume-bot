@@ -620,8 +620,7 @@ async def handle_jd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error("pdflatex failed: %s", diagnostic)
         await status.edit_text("The PDF could not be compiled. Check the bot logs for details.")
         return
-    company = _infer_company(job_description)
-    filename = f"{company}_Tailored_Resume.pdf" if company else "Tailored_Resume.pdf"
+    filename = _build_resume_filename(profile, job_description)
     caption = "Tailored resume generated from provenance-checked source facts."
     if plan.warnings:
         caption += " Some AI suggestions failed validation, so concise source content was retained."
@@ -631,18 +630,85 @@ async def handle_jd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await status.delete()
 
 
-def _infer_company(text: str) -> str:
-    patterns = [
-        r"(?:at|join|for|with)\s+([A-Z][A-Za-z0-9&-]{1,30})",
-        r"^([A-Z][A-Za-z0-9&-]{1,30})\s+is\s+(?:looking|hiring|seeking)",
-        r"([A-Z][A-Za-z0-9&-]{1,30})\s+Job\s+Description",
-    ]
-    stopwords = {"The", "We", "Our", "You", "This", "A", "An", "Your", "About"}
-    for pattern in patterns:
-        match = re.search(pattern, text, re.MULTILINE)
-        if match and match.group(1) not in stopwords:
-            return re.sub(r"[^\w-]", "_", match.group(1))
-    return ""
+_GENERIC_JOB_METADATA = {
+    "about us",
+    "company",
+    "company name",
+    "our company",
+    "our team",
+    "the company",
+    "the role",
+}
+
+
+def _metadata_value(value: str) -> str:
+    cleaned = value.split("|", 1)[0].strip(" \t:-–—")
+    if not cleaned or cleaned.casefold() in _GENERIC_JOB_METADATA:
+        return ""
+    return cleaned if len(cleaned) <= 80 else ""
+
+
+def _labeled_job_value(text: str, labels: str) -> str:
+    match = re.search(
+        rf"^\s*(?:{labels})\s*:\s*([^\n]+?)\s*$",
+        text,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    return _metadata_value(match.group(1)) if match else ""
+
+
+def _infer_job_metadata(text: str) -> tuple[str, str]:
+    """Return a company and role only when the JD states them explicitly."""
+    company = _labeled_job_value(
+        text, r"company(?:\s+name)?|organization|organisation|employer"
+    )
+    role = _labeled_job_value(text, r"job\s+title|position|role")
+
+    if not company or not role:
+        at_match = re.search(
+            r"^\s*([A-Z][A-Za-z0-9 /&+.#()'-]{2,80}?)\s+at\s+"
+            r"([A-Z][A-Za-z0-9 &+.#()'-]{1,80}?)\s*$",
+            text,
+            re.MULTILINE,
+        )
+        if at_match:
+            role = role or _metadata_value(at_match.group(1))
+            company = company or _metadata_value(at_match.group(2))
+
+    if not company:
+        about_match = re.search(
+            r"^\s*About\s+([A-Z][A-Za-z0-9 &+.#()'-]{1,80}?)\s*$",
+            text,
+            re.MULTILINE,
+        )
+        if about_match:
+            company = _metadata_value(about_match.group(1))
+
+    if not company:
+        hiring_match = re.search(
+            r"^\s*([A-Z][A-Za-z0-9 &+.#()'-]{1,80}?)\s+is\s+"
+            r"(?:hiring|looking|seeking)\b",
+            text,
+            re.MULTILINE,
+        )
+        if hiring_match:
+            company = _metadata_value(hiring_match.group(1))
+
+    return company, role
+
+
+def _filename_part(value: str, limit: int = 60) -> str:
+    cleaned = re.sub(r"[^\w]+", "_", value, flags=re.UNICODE).strip("_")
+    return cleaned[:limit].rstrip("_")
+
+
+def _build_resume_filename(profile: ResumeProfile, job_description: str) -> str:
+    company, role = _infer_job_metadata(job_description)
+    parts = [_filename_part(profile.name)]
+    parts.extend(part for part in (_filename_part(company), _filename_part(role)) if part)
+    if len(parts) > 1:
+        parts.append("Resume")
+    return "_".join(parts) + ".pdf"
 
 
 def main() -> None:

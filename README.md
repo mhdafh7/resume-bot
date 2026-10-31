@@ -104,6 +104,10 @@ The first build installs TeX Live and can take several minutes.
 6. Download the returned PDF and review every claim before applying.
 7. Paste another job description whenever you need another tailored version.
 
+When the job description explicitly identifies a company and role, the PDF uses
+`Name_Company_Role_Resume.pdf`. Ambiguous descriptions use the safe fallback
+`Name.pdf`; the bot does not guess a company from ordinary prose.
+
 The bot accepts messages only from `TELEGRAM_ALLOWED_USER_ID`. Other Telegram
 accounts receive no resume data or command output.
 
