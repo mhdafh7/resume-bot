@@ -380,7 +380,7 @@ def render_experience(profile: ResumeProfile, plan: TailoringPlan) -> str:
 def render_skills(plan: TailoringPlan) -> str:
     return "\n".join(
         rf"    \small{{\item{{ \textbf{{{latex_escape(group.category)}}}"
-        rf"{{: {latex_escape(', '.join(group.items))}}} \\ }}}}"
+        rf": \textit{{{latex_escape(', '.join(group.items))}}} \\ }}}}"
         for group in plan.skills
     )
 
@@ -754,7 +754,6 @@ def _preserve_role_evidence(
         for index, text in enumerate(role.bullets)
     }
     candidates: list[TailoredBullet] = []
-    restored: set[str] = set()
     for bullet in bullets:
         missing = [
             fact_id for fact_id in bullet.source_fact_ids
@@ -762,12 +761,13 @@ def _preserve_role_evidence(
             and not _retains_source_detail(facts[fact_id], bullet.text)
         ]
         if missing:
-            # Restore all citations of a combined rewrite so replacing it cannot
-            # silently discard its other source facts.
-            for fact_id in bullet.source_fact_ids:
-                if fact_id not in restored:
-                    candidates.append(TailoredBullet(facts[fact_id], (fact_id,)))
-                    restored.add(fact_id)
+            # The model grouped these facts into one achievement. Preserve that
+            # grouping when restoring wording: atomic facts may be fragments
+            # such as "Built a browser extension", not finished resume bullets.
+            candidates.append(TailoredBullet(
+                " ".join(facts[fact_id] for fact_id in bullet.source_fact_ids),
+                bullet.source_fact_ids,
+            ))
         else:
             candidates.append(bullet)
     cited = {fact_id for bullet in candidates for fact_id in bullet.source_fact_ids}
@@ -968,6 +968,14 @@ def build_tailoring_prompt(profile: ResumeProfile, job_description: str) -> str:
         "bullets. Each bullet has text and source_fact_ids. Rewrite source facts "
         "only when needed for clarity. Prefer the original wording when already relevant. "
         "Preserve implementation mechanisms, scope, outcomes, and role focus. "
+        "Source facts may be atomic notes rather than finished resume bullets. "
+        "Combine related facts about the same project into a complete achievement: "
+        "what was built or changed, how, and its supported purpose, scope, or result. "
+        "Keep a project's action, implementation, and impact together; do not "
+        "spend separate bullet slots on fragments such as 'Built a browser extension'. "
+        "Do not join unrelated projects or invent a result to make a bullet impressive. "
+        "When the source lacks detail, use the strongest supported wording instead "
+        "of padding it. Bullet limits are maxima, not targets. "
         "A rewritten bullet may cite one or more facts from the same role. Never "
         "add an outcome, metric, technology, scope, leadership claim, or keyword "
         "that is not present in its cited facts. Preserve every number exactly. "

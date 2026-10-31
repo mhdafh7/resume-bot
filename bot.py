@@ -76,8 +76,10 @@ the same role. The summary must cite summary_source_fact_ids. Never infer or
 estimate metrics, scale, ownership, technologies, leadership, business outcomes,
 or job-description keywords. Preserve source numbers exactly. Cover every
 source-backed skill explicitly requested by the job description, then prefer
-concise achievements over fragmented duties. Every source role must be represented
-by its role_index.
+complete achievements over fragmented duties. Keep related action, implementation,
+and impact facts in one bullet with all their citations; do not split a project
+into standalone activity fragments to fill the bullet limit. Never invent impact.
+Every source role must be represented by its role_index.
 """
 
 TAILORING_RESPONSE_SCHEMA = {

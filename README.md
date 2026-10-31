@@ -190,7 +190,12 @@ After setup, paste a job description directly into the chat. The bot:
    project labels and common stopwords may be removed. Relevant terms in the source
    summary are preserved. Rewritten bullets can use up to 600 characters; trusted
    original facts may be longer. Shorter wording is preferred only when evidence survives.
-8. Escapes and renders all LaTeX locally with shell execution disabled.
+   When a rewrite combines related facts, restored wording stays in the same bullet
+   with all citations, rather than expanding atomic notes into standalone fragments.
+   The prompt asks for complete achievements with supported implementation and impact;
+   it does not invent outcomes when the source lacks detail.
+8. Escapes and renders all LaTeX locally with shell execution disabled. Skill values
+   are italicized under bold category labels and remain selectable PDF text.
 9. Returns the compiled PDF followed by a coverage report separating listed skills
    from phrase matches in experience. It reports omitted source fact IDs and themes,
    and requirements without matching experience evidence. Phrase matches are
