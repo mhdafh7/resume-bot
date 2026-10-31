@@ -62,7 +62,7 @@ GEMINI_API_KEY=replace_me
 Optionally override the model:
 
 ```dotenv
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 The container defaults to UID/GID `1000:1000`. If your host account uses

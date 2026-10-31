@@ -50,7 +50,8 @@ BASE_DIR = Path(__file__).parent
 TEMPLATE_PATH = BASE_DIR / "resume_template.tex"
 DATA_DIR = BASE_DIR / "data"
 RESUME_DATA_PATH = DATA_DIR / "resume_data.md"
-MODEL_ID = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL_ID = "gemini-3.8-flash"
+MODEL_ID = os.getenv("GEMINI_MODEL", DEFAULT_MODEL_ID)
 
 (
     SETUP_NAME,
@@ -114,7 +115,6 @@ def tailor_with_llm(
         contents=build_tailoring_prompt(profile, job_description),
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            temperature=0.2,
             max_output_tokens=4096,
             response_mime_type="application/json",
         ),
