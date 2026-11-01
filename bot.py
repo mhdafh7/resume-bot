@@ -29,8 +29,10 @@ from resume_core import (
     ResumeFormatError,
     ResumeProfile,
     TailoringPlan,
+    TailoringQualityError,
     build_tailoring_coverage_report,
     build_tailoring_prompt,
+    build_tailoring_repair_prompt,
     latex_escape,
     parse_resume_markdown,
     profile_to_markdown,
@@ -38,6 +40,7 @@ from resume_core import (
     render_experience,
     render_heading,
     render_skills,
+    tailoring_quality_issues,
     validate_tailoring_response,
 )
 
@@ -180,17 +183,33 @@ def save_resume_markdown(markdown: str) -> ResumeProfile:
 def tailor_with_llm(
     client: genai.Client, profile: ResumeProfile, job_description: str
 ) -> TailoringPlan:
-    response = client.models.generate_content(
-        model=MODEL_ID,
-        contents=build_tailoring_prompt(profile, job_description),
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            max_output_tokens=4096,
-            response_mime_type="application/json",
-            response_json_schema=TAILORING_RESPONSE_SCHEMA,
-        ),
+    prompt = build_tailoring_prompt(profile, job_description)
+    for attempt in range(2):
+        response = client.models.generate_content(
+            model=MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                max_output_tokens=4096,
+                response_mime_type="application/json",
+                response_json_schema=TAILORING_RESPONSE_SCHEMA,
+            ),
+        )
+        plan = validate_tailoring_response(response.text or "", profile, job_description)
+        issues = tailoring_quality_issues(plan)
+        logger.info(
+            "Tailoring attempt %d: %d roles, %d bullets, %d quality issues; warnings=%s",
+            attempt + 1, len(plan.experience),
+            sum(len(role.bullets) for role in plan.experience), len(issues),
+            "; ".join(plan.warnings) or "none",
+        )
+        if not issues:
+            return plan
+        if attempt == 0:
+            prompt = build_tailoring_repair_prompt(profile, job_description, plan, issues)
+    raise TailoringQualityError(
+        "Could not produce complete source-backed achievements after one repair attempt."
     )
-    return validate_tailoring_response(response.text or "", profile, job_description)
 
 
 def compile_latex(profile: ResumeProfile, plan: TailoringPlan) -> tuple[bytes | None, str]:
@@ -617,6 +636,14 @@ async def handle_jd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 logger.warning("Tailoring warnings: %s", "; ".join(plan.warnings))
             await status.edit_text("Rendering and compiling the PDF…")
             pdf_bytes, diagnostic = await asyncio.to_thread(compile_latex, profile, plan)
+        except TailoringQualityError:
+            await status.edit_text(
+                "The draft still contains incomplete activity fragments after a rewrite "
+                "attempt, so no PDF was sent. Try generating again. If this repeats, "
+                "use /showresume and add project context, implementation details, or "
+                "outcomes to short notes."
+            )
+            return
         except subprocess.TimeoutExpired:
             await status.edit_text("PDF compilation timed out. Please try again.")
             return

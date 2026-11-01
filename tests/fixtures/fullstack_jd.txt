@@ -1,0 +1,17 @@
+Software Engineer 1 - Full Stack
+We are looking for a motivated Software Engineer with 1-3 years of experience developing, testing, and maintaining reliable, scalable, high-performance fullstack applications and APIs.
+Strong programming fundamentals and hands-on experience with Java, Kotlin, or Python, ReactJS are required.
+Responsibilities:
+- Design, develop, test, and maintain backend applications, services, and RESTful APIs using Java, Kotlin, or Python, ReactJS and frameworks such as Spring Boot, Django, or FastAPI.
+- Write clean, efficient, reusable, maintainable code and collaborate with engineers and Product Managers.
+- Develop unit and integration tests. Apply object-oriented programming, design patterns, and Test-Driven Development (TDD).
+- Work with relational databases, write efficient SQL queries, and understand transactions, ACID properties, and data consistency.
+- Debug production issues, participate in code reviews, and improve performance, monitoring, and reliability of backend services.
+- Work in an Agile team and take ownership of tasks with testing and documentation.
+- Learn microservices, distributed systems, Domain-Driven Design (DDD), and root cause analysis.
+- Use agentic development tools to deliver features.
+Qualifications:
+- Strong Java, Kotlin, or Python programming skills and ReactJS experience.
+- Experience with Spring Boot, Django, or FastAPI and developing and consuming RESTful APIs.
+- Familiarity with Git, version control workflows, and CI/CD fundamentals.
+- Strong analytical and communication skills and willingness to learn.

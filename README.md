@@ -178,9 +178,11 @@ After setup, paste a job description directly into the chat. The bot:
 3. Rejects unknown skills, cross-role citations, unsupported numeric claims,
    role-specific technologies absent from cited facts, and oversized content.
 4. Guarantees that source-backed JD skills survive selection, including common
-   equivalents such as `HTML`/`HTML5` and `state management`/`Zustand`.
-5. Ranks facts using literal matches plus frontend concepts such as state management,
-   responsive UI, modularity, ownership, collaboration, and performance.
+   equivalents such as `HTML`/`HTML5`, `ReactJS`/`React`, `Java`/`Java 17`,
+   `RESTful APIs`/`REST APIs`, and `CI/CD`/`GitLab CI/CD`.
+5. Ranks explicit technology matches ahead of generic themes such as modularity,
+   ownership, collaboration, and performance. Repeated stack requirements carry
+   extra weight up to a fixed cap.
 6. Preserves every employment role and enforces a six-bullet limit for the current
    role and two bullets for earlier roles. Eight skills per category and 24 total
    are targets for optional skills; source-backed JD matches take precedence.
@@ -194,12 +196,22 @@ After setup, paste a job description directly into the chat. The bot:
    with all citations, rather than expanding atomic notes into standalone fragments.
    The prompt asks for complete achievements with supported implementation and impact;
    it does not invent outcomes when the source lacks detail.
-8. Escapes and renders all LaTeX locally with shell execution disabled. Skill values
+8. Checks the validated plan for short activity fragments, including source
+   fallback output. Notes under ten words without a measured result or explicit
+   implementation/purpose context trigger one
+   model repair using the full source and concrete feedback. The repaired plan
+   passes the same provenance and quality checks. If fragments remain, the bot
+   explains the problem and does not send a PDF. This heuristic detects bare notes;
+   it is not a semantic guarantee of writing quality. No extra call is made when
+   the first plan passes.
+9. Escapes and renders all LaTeX locally with shell execution disabled. Skill values
    are italicized under bold category labels and remain selectable PDF text.
-9. Returns the compiled PDF followed by a coverage report separating listed skills
-   from phrase matches in experience. It reports omitted source fact IDs and themes,
-   and requirements without matching experience evidence. Phrase matches are
-   indicators for review, not proof that a requirement is satisfied.
+10. Returns the compiled PDF followed by a coverage report separating listed skills
+    from phrase matches in experience. It shows readable previews of source notes
+    that were shortened or omitted, and requirements without matching evidence.
+    Explicit alternatives such as “Java, Kotlin, or Python” are satisfied by any
+    supported member; a separately stated requirement is still checked. Phrase
+    matches are indicators for review, not proof that a requirement is satisfied.
 
 The evidence-retention check is deliberately conservative: it can restore an
 original even when a paraphrase is equivalent. Bullet limits still apply, and
@@ -324,8 +336,14 @@ container and send `/setup` again.
 the examples above. Every experience needs at least one bullet.
 
 **Gemini output fails validation:** the bot retains a concise, relevance-ranked
-subset of safe source facts and notes the fallback in the PDF caption. Review
-container logs for the validation warning.
+subset of safe source facts, checks it for fragments, and requests one repair if
+needed. Review container logs for per-attempt counts and validation warnings.
+The logs do not include the resume text or job description.
+
+**The bot reports incomplete activity fragments:** it could not produce complete
+achievements after the repair attempt. Try again; if this repeats, use
+`/showresume` to check that project notes contain enough implementation context
+and outcomes to combine without inventing claims. No PDF is sent in this case.
 
 **PDF compilation fails:** inspect `docker compose logs resume-bot`. Detailed TeX
 diagnostics stay in logs rather than being sent through Telegram.

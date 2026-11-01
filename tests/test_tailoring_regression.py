@@ -133,8 +133,9 @@ class EvidenceRetentionTests(unittest.TestCase):
             b for b in plan.experience[0].bullets if 'r0f0' not in b.source_fact_ids
         )), *plan.experience[1:]))
         report = build_tailoring_coverage_report(self.profile, plan, self.jd)
-        self.assertIn('r0f0', next(line for line in report.splitlines()
-                                   if line.startswith('Supported evidence omitted:')))
+        self.assertIn('Source notes to review: 1', report)
+        self.assertIn('Microfrontend Platform:', report)
+        self.assertNotIn('r0f0', report)
 
 
 if __name__ == '__main__':
